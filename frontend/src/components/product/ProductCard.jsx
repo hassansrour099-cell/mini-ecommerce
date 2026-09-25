@@ -14,7 +14,7 @@ export default function ProductCard({ product }) {
       <h2>{product.name}</h2>
       <div className="meta">
         <span className="price">{price}</span>
-        {product.variantCount > 1 ? <span>{product.variantCount} options</span> : <span>In stock</span>}
+        {product.variantCount > 1 ? <span>{product.variantCount} options</span> : null}
       </div>
     </Link>
   );
