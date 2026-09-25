@@ -1,0 +1,24 @@
+:root {
+  --bg: #e7e1d6;
+  --surface: #f7f3ec;
+  --ink: #1c1915;
+  --muted: #5e584e;
+  --line: #d3cbbd;
+  --accent: #8f3d2b;
+  --accent-ink: #fffaf6;
+  --good: #1f6b45;
+  --danger: #8f3d2b;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --font-text: "Public Sans", "Segoe UI", sans-serif;
+  --font-display: "Newsreader", Georgia, serif;
+  --header-h: 64px;
+  --nav-h: 64px;
+  --page: 1120px;
+}
