@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "seed": "npm run seed -w backend",
+    "test:e2e": "node backend/test/smoke-test.js",
     "setup": "npm install && npm run seed"
   },
   "devDependencies": {

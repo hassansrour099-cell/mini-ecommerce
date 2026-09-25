@@ -11,13 +11,19 @@ export default function CartPage() {
   const { items, totalCents, loading, error, refresh, update, remove } = useCart();
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState("");
+  const [noticeBad, setNoticeBad] = useState(false);
 
   async function run(item, action) {
     setBusyId(item.id);
     setNotice("");
     try {
-      await action();
+      const result = await action();
+      if (result?.warning) {
+        setNoticeBad(false);
+        setNotice(result.warning);
+      }
     } catch (err) {
+      setNoticeBad(true);
       setNotice(err.message);
     } finally {
       setBusyId(null);
@@ -47,7 +53,7 @@ export default function CartPage() {
     <section>
       <h1>Cart</h1>
       {notice ? (
-        <p className="status bad" role="alert">
+        <p className={noticeBad ? "status bad" : "status"} role={noticeBad ? "alert" : "status"} aria-live="polite">
           {notice}
         </p>
       ) : null}

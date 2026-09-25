@@ -27,7 +27,10 @@ export async function api(path, { method = "GET", body } = {}) {
   const data = await response.json().catch(() => ({}));
   if (response.status === 401 && token) onUnauthorized();
   if (!response.ok) {
-    throw new ApiError(data.error || "Request failed", response.status, data);
+    const envelope = data.error;
+    const message =
+      typeof envelope === "string" ? envelope : envelope?.message || "Request failed";
+    throw new ApiError(message, response.status, data);
   }
   return data;
 }

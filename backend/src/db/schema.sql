@@ -48,13 +48,13 @@ CREATE TABLE orders (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Copied at checkout so a later price or rename does not rewrite a placed order.
+-- Snapshots stay fixed if the catalog title or price changes later.
 CREATE TABLE order_items (
   id INTEGER PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES orders(id),
   variant_id INTEGER NOT NULL REFERENCES product_variants(id),
-  product_name TEXT NOT NULL,
-  variant_label TEXT NOT NULL,
-  unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0),
+  product_title_snapshot TEXT NOT NULL,
+  variant_name_snapshot TEXT NOT NULL,
+  price_cents_at_purchase INTEGER NOT NULL CHECK (price_cents_at_purchase >= 0),
   quantity INTEGER NOT NULL CHECK (quantity > 0)
 );

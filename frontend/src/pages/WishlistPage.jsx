@@ -25,7 +25,7 @@ export default function WishlistPage() {
         variantId: item.variants[0].id,
         quantity: 1,
       });
-      setNotice(result.clamped ? `${item.name} was added, limited to remaining stock.` : `${item.name} moved to cart.`);
+      setNotice(result.warning || `${item.name} moved to cart.`);
     } catch (err) {
       setNotice(err.message);
     } finally {

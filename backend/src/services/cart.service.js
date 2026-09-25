@@ -29,9 +29,10 @@ function assertVariantForProduct(variant, productId) {
 }
 
 function stockError(variant, requested) {
+  const unit = variant.stock_quantity === 1 ? 'unit' : 'units';
   return createHttpError(
     409,
-    `${variant.product_name} (${variant.label}) only has ${variant.stock_quantity} in stock`,
+    `Only ${variant.stock_quantity} ${unit} of '${variant.product_name} (${variant.label})' remain in stock.`,
     {
       code: 'INSUFFICIENT_STOCK',
       details: {
@@ -39,10 +40,14 @@ function stockError(variant, requested) {
         variantLabel: variant.label,
         variantId: variant.id,
         requested,
-        available: variant.stock_quantity,
+        availableStock: variant.stock_quantity,
       },
     }
   );
+}
+
+function clampWarning(quantity) {
+  return `Added ${quantity} items (maximum available stock)`;
 }
 
 function mapCartItem(row, variantsByProduct) {
@@ -111,30 +116,31 @@ export function getCart(userId) {
 function writeQuantity(userId, variant, quantity, existing) {
   if (variant.stock_quantity < 1) throw stockError(variant, quantity);
 
+  const requestedTotal = (existing ? existing.quantity : 0) + quantity;
+  const next = Math.min(requestedTotal, variant.stock_quantity);
+  const clamped = next < requestedTotal;
+
   if (existing) {
-    const next = Math.min(existing.quantity + quantity, variant.stock_quantity);
     db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(next, existing.id);
-    return next < existing.quantity + quantity;
+  } else {
+    try {
+      db.prepare('INSERT INTO cart_items (user_id, variant_id, quantity) VALUES (?, ?, ?)').run(
+        userId,
+        variant.id,
+        next
+      );
+    } catch (err) {
+      if (err.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw err;
+      const row = db
+        .prepare('SELECT id, quantity FROM cart_items WHERE user_id = ? AND variant_id = ?')
+        .get(userId, variant.id);
+      const merged = Math.min(row.quantity + quantity, variant.stock_quantity);
+      db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(merged, row.id);
+      return { clamped: merged < row.quantity + quantity, quantity: merged };
+    }
   }
 
-  if (quantity > variant.stock_quantity) throw stockError(variant, quantity);
-
-  try {
-    db.prepare('INSERT INTO cart_items (user_id, variant_id, quantity) VALUES (?, ?, ?)').run(
-      userId,
-      variant.id,
-      quantity
-    );
-  } catch (err) {
-    if (err.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw err;
-    const row = db
-      .prepare('SELECT id, quantity FROM cart_items WHERE user_id = ? AND variant_id = ?')
-      .get(userId, variant.id);
-    const next = Math.min(row.quantity + quantity, variant.stock_quantity);
-    db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(next, row.id);
-    return next < row.quantity + quantity;
-  }
-  return false;
+  return { clamped, quantity: next };
 }
 
 export function addToCart(userId, body) {
@@ -147,8 +153,12 @@ export function addToCart(userId, body) {
   const existing = db
     .prepare('SELECT id, quantity FROM cart_items WHERE user_id = ? AND variant_id = ?')
     .get(userId, variant.id);
-  const clamped = writeQuantity(userId, variant, quantity, existing);
-  return { clamped, cart: getCart(userId) };
+  const written = writeQuantity(userId, variant, quantity, existing);
+  return {
+    clamped: written.clamped,
+    warning: written.clamped ? clampWarning(written.quantity) : null,
+    cart: getCart(userId),
+  };
 }
 
 export function updateCartItem(userId, itemId, body) {
@@ -173,16 +183,19 @@ export function updateCartItem(userId, itemId, body) {
     throw createHttpError(400, 'Variant does not belong to that product');
   }
 
-  const quantity = body.quantity !== undefined ? parseQuantity(body.quantity) : item.quantity;
-  if (quantity > variant.stock_quantity) throw stockError(variant, quantity);
+  const requested = body.quantity !== undefined ? parseQuantity(body.quantity) : item.quantity;
+  if (variant.stock_quantity < 1) throw stockError(variant, requested);
+  const quantity = Math.min(requested, variant.stock_quantity);
+  const clamped = quantity < requested;
 
   const conflict = db
     .prepare('SELECT id, quantity FROM cart_items WHERE user_id = ? AND variant_id = ? AND id != ?')
     .get(userId, variant.id, item.id);
 
+  let lineQuantity = quantity;
   if (conflict) {
-    const merged = Math.min(conflict.quantity + quantity, variant.stock_quantity);
-    db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(merged, conflict.id);
+    lineQuantity = Math.min(conflict.quantity + quantity, variant.stock_quantity);
+    db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(lineQuantity, conflict.id);
     db.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?').run(item.id, userId);
   } else {
     db.prepare('UPDATE cart_items SET variant_id = ?, quantity = ? WHERE id = ? AND user_id = ?').run(
@@ -193,7 +206,11 @@ export function updateCartItem(userId, itemId, body) {
     );
   }
 
-  return getCart(userId);
+  const limited = clamped || (conflict && lineQuantity < conflict.quantity + quantity);
+  return {
+    warning: limited ? clampWarning(lineQuantity) : null,
+    cart: getCart(userId),
+  };
 }
 
 export function removeCartItem(userId, itemId) {

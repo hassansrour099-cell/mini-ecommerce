@@ -40,8 +40,9 @@ export default function CheckoutPage() {
       await refresh();
       setParams({ order: String(data.order.id) });
     } catch (err) {
-      if (err.status === 409 && err.body?.code === "INSUFFICIENT_STOCK") {
-        setStockIssue(err.body.details);
+      const payload = err.body?.error;
+      if (err.status === 409 && payload?.code === "INSUFFICIENT_STOCK") {
+        setStockIssue({ ...payload.details, message: payload.message });
       } else {
         setFormError(err.message);
       }
@@ -128,10 +129,7 @@ export default function CheckoutPage() {
       </div>
       {stockIssue ? (
         <div className="status bad" role="alert">
-          <p>
-            {stockIssue.productName} ({stockIssue.variantLabel}) has {stockIssue.available} left. You asked for{" "}
-            {stockIssue.requested}.
-          </p>
+          <p>{stockIssue.message}</p>
           <Link className="btn btn-ghost" to="/cart">
             Update cart
           </Link>

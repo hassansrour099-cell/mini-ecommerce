@@ -58,7 +58,7 @@ export default function ProductDetailPage() {
     setError("");
     try {
       const result = await add({ productId: product.id, variantId: selected.id, quantity });
-      setNotice(result.clamped ? "Added, limited to the quantity still in stock." : "Added to cart.");
+      setNotice(result.warning || "Added to cart.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -89,7 +89,7 @@ export default function ProductDetailPage() {
     <article className="detail">
       <div className="detail-mark">
         <strong>{String(product.id).padStart(2, "0")}</strong>
-        <p className="muted">{selected.stockQuantity} in stock</p>
+        <p className="muted mono">{selected.stockQuantity} in stock</p>
       </div>
       <div className="stack">
         <h1>{product.name}</h1>

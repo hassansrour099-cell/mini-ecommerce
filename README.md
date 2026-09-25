@@ -34,3 +34,4 @@ The login screen shows the seeded demo email and password. The seed script print
 - `npm run dev` starts the API and the client.
 - `npm run seed` deletes the SQLite file, recreates the schema, and loads the catalog. Stop the API first if the database file is locked.
 - `npm run setup` installs dependencies, then seeds.
+- `npm run test:e2e` seeds a temporary database, boots the API, and checks login, cart, checkout, and a stock conflict. It does not use the dev database.

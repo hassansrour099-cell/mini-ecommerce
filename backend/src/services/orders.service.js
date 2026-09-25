@@ -1,6 +1,23 @@
 import db from '../db/connection.js';
 import { createHttpError } from '../middleware/errorHandler.js';
 
+export class InsufficientStockError extends Error {
+  constructor(line, available) {
+    const label = `${line.product_name} (${line.variant_label})`;
+    const unit = available === 1 ? 'unit' : 'units';
+    super(`Only ${available} ${unit} of '${label}' remain in stock.`);
+    this.name = 'InsufficientStockError';
+    this.code = 'INSUFFICIENT_STOCK';
+    this.details = {
+      variantId: line.variant_id,
+      availableStock: available,
+      productName: line.product_name,
+      variantLabel: line.variant_label,
+      requested: line.quantity,
+    };
+  }
+}
+
 function mapOrder(order, items) {
   return {
     id: order.id,
@@ -9,11 +26,11 @@ function mapOrder(order, items) {
     items: items.map((item) => ({
       id: item.id,
       variantId: item.variant_id,
-      productName: item.product_name,
-      variantLabel: item.variant_label,
-      unitPriceCents: item.unit_price_cents,
+      productName: item.product_title_snapshot,
+      variantLabel: item.variant_name_snapshot,
+      unitPriceCents: item.price_cents_at_purchase,
       quantity: item.quantity,
-      lineTotalCents: item.unit_price_cents * item.quantity,
+      lineTotalCents: item.price_cents_at_purchase * item.quantity,
     })),
   };
 }
@@ -29,7 +46,7 @@ export function getOrder(userId, orderId) {
 
   const items = db
     .prepare(
-      `SELECT id, variant_id, product_name, variant_label, unit_price_cents, quantity
+      `SELECT id, variant_id, product_title_snapshot, variant_name_snapshot, price_cents_at_purchase, quantity
        FROM order_items
        WHERE order_id = ?
        ORDER BY id`
@@ -37,23 +54,6 @@ export function getOrder(userId, orderId) {
     .all(order.id);
 
   return mapOrder(order, items);
-}
-
-function insufficient(line, available) {
-  return createHttpError(
-    409,
-    `${line.product_name} (${line.variant_label}) only has ${available} in stock`,
-    {
-      code: 'INSUFFICIENT_STOCK',
-      details: {
-        productName: line.product_name,
-        variantLabel: line.variant_label,
-        variantId: line.variant_id,
-        requested: line.quantity,
-        available,
-      },
-    }
-  );
 }
 
 export function placeOrder(userId) {
@@ -82,7 +82,7 @@ export function placeOrder(userId) {
     for (const line of lines) {
       const current = stockStmt.get(line.variant_id);
       const available = current ? current.stock_quantity : 0;
-      if (line.quantity > available) throw insufficient(line, available);
+      if (line.quantity > available) throw new InsufficientStockError(line, available);
     }
 
     const totalCents = lines.reduce((sum, line) => sum + line.price_cents * line.quantity, 0);
@@ -93,7 +93,7 @@ export function placeOrder(userId) {
 
     const insertItem = db.prepare(
       `INSERT INTO order_items
-         (order_id, variant_id, product_name, variant_label, unit_price_cents, quantity)
+         (order_id, variant_id, product_title_snapshot, variant_name_snapshot, price_cents_at_purchase, quantity)
        VALUES (?, ?, ?, ?, ?, ?)`
     );
     const decrement = db.prepare(
@@ -106,7 +106,7 @@ export function placeOrder(userId) {
       const result = decrement.run(line.quantity, line.variant_id, line.quantity);
       if (result.changes !== 1) {
         const current = stockStmt.get(line.variant_id);
-        throw insufficient(line, current ? current.stock_quantity : 0);
+        throw new InsufficientStockError(line, current ? current.stock_quantity : 0);
       }
       insertItem.run(
         orderId,
@@ -122,6 +122,6 @@ export function placeOrder(userId) {
     return orderId;
   });
 
-  const orderId = checkout(userId);
+  const orderId = checkout.immediate(userId);
   return getOrder(userId, orderId);
 }

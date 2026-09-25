@@ -45,7 +45,37 @@ export function CartProvider({ children }) {
   }
 
   async function update(itemId, body) {
-    applyCart(await api(`/api/cart/${itemId}`, { method: "PATCH", body }));
+    const previousItems = items;
+    const previousTotal = totalCents;
+    const nextItems = items.map((item) => {
+      if (item.id !== itemId) return item;
+      if (body.quantity != null) {
+        return { ...item, quantity: body.quantity, lineTotalCents: item.priceCents * body.quantity };
+      }
+      const variant = item.variants?.find((entry) => entry.id === body.variantId);
+      if (!variant) return item;
+      return {
+        ...item,
+        variantId: variant.id,
+        variantLabel: variant.label,
+        priceCents: variant.priceCents,
+        stockQuantity: variant.stockQuantity,
+        lineTotalCents: variant.priceCents * item.quantity,
+      };
+    });
+    if (body.quantity != null || body.variantId != null) {
+      setItems(nextItems);
+      setTotalCents(nextItems.reduce((sum, item) => sum + item.lineTotalCents, 0));
+    }
+    try {
+      const result = await api(`/api/cart/${itemId}`, { method: "PATCH", body });
+      applyCart(result.cart);
+      return result;
+    } catch (err) {
+      setItems(previousItems);
+      setTotalCents(previousTotal);
+      throw err;
+    }
   }
 
   async function remove(itemId) {

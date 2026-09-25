@@ -171,7 +171,7 @@ select {
   min-height: 42px;
   padding: 8px 16px;
   border: 1px solid var(--ink);
-  border-radius: 2px;
+  border-radius: 4px;
   background: transparent;
   cursor: pointer;
   text-decoration: none;
@@ -250,9 +250,15 @@ select {
   font-size: 14px;
 }
 
-.price {
+.mono,
+.price,
+.total-row strong,
+.summary-row strong,
+.cart-line > strong {
   color: var(--ink);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .detail {
@@ -298,7 +304,7 @@ select {
   border: 1px solid var(--line);
   background: var(--surface);
   padding: 8px 12px;
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: pointer;
 }
 
@@ -346,7 +352,7 @@ select {
   height: 44px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 4px;
   background: var(--surface);
 }
 
@@ -413,7 +419,7 @@ select.variant-select {
   height: 40px;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 2px;
+  border-radius: 4px;
   padding: 0 8px;
 }
 

@@ -126,7 +126,10 @@ if (fs.existsSync(env.databasePath)) {
 }
 
 const db = new Database(env.databasePath);
+db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('synchronous = NORMAL');
+db.pragma('busy_timeout = 5000');
 db.exec(schema);
 
 const insertUser = db.prepare(
@@ -157,10 +160,24 @@ const seed = db.transaction(() => {
 });
 
 seed();
+
+const tables = db
+  .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+  .all()
+  .map((row) => row.name);
 db.close();
 
 const variantCount = products.reduce((sum, product) => sum + product.variants.length, 0);
-console.log(`Seeded ${products.length} products and ${variantCount} variants.`);
-console.log('Demo login');
-console.log(`  email: ${demoAccount.email}`);
-console.log(`  password: ${demoAccount.password}`);
+const rows = [
+  ['Database', env.databasePath],
+  ['Tables', tables.join(', ')],
+  ['Products', String(products.length)],
+  ['Variants', String(variantCount)],
+  ['Email', demoAccount.email],
+  ['Password', demoAccount.password],
+];
+const labelWidth = Math.max(...rows.map((row) => row[0].length));
+console.log('Copper & Grain seed');
+for (const [label, value] of rows) {
+  console.log(`${label.padEnd(labelWidth)}  ${value}`);
+}

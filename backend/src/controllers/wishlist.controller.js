@@ -103,6 +103,7 @@ export function moveWishlistItem(req, res) {
   const result = move();
   res.json({
     clamped: result.clamped,
+    warning: result.warning,
     cart: result.cart,
     items: listForUser(req.user.id),
   });
